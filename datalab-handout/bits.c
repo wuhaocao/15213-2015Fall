@@ -140,7 +140,15 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+  int revX = ~x;
+  int revY = ~y;
+
+  int res1 = x & revY;
+  int res2 = y & revX;
+
+  int res = ~res1 & ~res2; // ~A & ~B  <=> A | B
+
+  return ~res;
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -149,7 +157,7 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-  return 2;
+  return 1 << 31;
 }
 //2
 /*
@@ -160,7 +168,13 @@ int tmin(void) {
  *   Rating: 2
  */
 int isTmax(int x) {
-  return 2;
+  int x_minux_1 = x + 1; // if x == Tmax, x + 1 = Tmin
+
+  int res = !(~x_minux_1 ^ x); // ^ can be used to determine whether the two are equal
+
+  res &= !!(~x ^ 0);
+
+  return res;
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -170,7 +184,22 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  // Set all odd bits in word to 1
+  int hexA_2 = 0xAA;
+  int hexA_8 = hexA_2 << 8;
+  int res;
+  hexA_8 |= hexA_2;
+  hexA_8 <<= 8;
+  hexA_8 |= hexA_2;
+  hexA_8 <<= 8;
+  hexA_8 |= hexA_2;
+
+  // Keep only the odd bits in x
+  x &= hexA_8;
+
+  res = x ^ hexA_8;
+
+  return !res;
 }
 /* 
  * negate - return -x 
@@ -180,7 +209,10 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  // ~x + 1 = -x
+  // ~(x - 1) = -x
+  x += ~0;
+  return ~x;
 }
 //3
 /* 
@@ -193,7 +225,25 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  int judge_pre, judge_post, Tmin, res;
+
+  // The pre bits must be the same as 0x30
+  judge_pre = x & ~0xF;
+  judge_pre ^= 0x30;
+
+  // Post needs to be less than 10, which means post minus 10 will result in a negative value
+  judge_post = x & 0xF;
+  judge_post += ~10 + 1;
+
+  // Determine whether the calculation result is a negative number
+  Tmin = 1 << 31;
+  judge_post &= Tmin;
+  judge_post ^= Tmin;
+  
+  // The pre and post conditions need to be met at the same time
+  res = judge_pre | judge_post;
+
+  return !res;
 }
 /* 
  * conditional - same as x ? y : z 
@@ -203,7 +253,15 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  // If x is 0, take the latter, otherwise take the former
+  int post = !x;
+  int pre = !post;
+
+  // all 0 or all 1(0 or -1)
+  pre = ~pre + 1;
+  post = ~post + 1;
+
+  return (y & pre) | (z & post);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -213,7 +271,15 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  // y - x
+  int revX = ~x + 1;
+  int y_minus_x = y + revX;
+
+  int res = !(y_minus_x >> 31); // y - x > 0
+  res |= (x >> 31) & !(y >> 31); // or (x < 0 and y > 0)
+  res &= !(!(x >> 31) & (y >> 31));// and !(x > 0 and y < 0)
+
+  return res;
 }
 //4
 /* 
@@ -225,7 +291,19 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+  // Returns 1 only when x=0, otherwise returns 0
+  // So determine whether x is equal to 0
+  // When x=0, x - 1 < 0 && x + 1 >= 0 && x >= 0
+  int plus1 = x + 1;
+  int minus1 = x + (~1 + 1);
+
+  int Tmin = 1 << 31;
+
+  // Note the difference between logical right shift and arithmetic right shift
+  int res = ((minus1 & Tmin) & (plus1 ^ Tmin) & (x ^ Tmin)) >> 31;
+  res &= 1;
+
+  return res;
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -255,7 +333,39 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned float_twice(unsigned uf) {
-  return 2;
+  unsigned exp = (uf & 0x7F800000) >> 23; // get specific exp
+  unsigned frac = uf & 0x007FFFFF; // get specific frac
+
+  unsigned res = uf; // if argument is NaN or infinity, return argument
+
+  if(exp ^ 0xFF) { // else if exp is not all 1
+    // If exp is not all 0, it means that frac has an implicit 1 before the decimal point
+    if(exp ^ 0x00) {
+      frac |= 0x800000;
+    }
+    
+    frac = 2 * frac; // calculate 2*f
+
+    if(frac & 0x01000000) { // if 2*f is not in the range 1~2
+      frac >>= 1;
+      exp += 1;
+      if(!(exp ^ 0xFF)) { // if exp is all 1 it means res needs to be infinite
+        frac = 0;
+      }
+    }
+    
+    if(!(exp ^ 0x00) && frac & 0x800000) { // if exp is all 0 and frac is between 1~2
+      exp += 1;
+    }
+
+    frac &= 0x7FFFFF;
+
+    res &= 0x80000000;
+    res |= exp << 23;
+    res |= frac;
+  }
+
+  return res;
 }
 /* 
  * float_i2f - Return bit-level equivalent of expression (float) x
@@ -267,7 +377,77 @@ unsigned float_twice(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_i2f(int x) {
-  return 2;
+  // values will be used
+  int step;
+  unsigned indicator;
+  
+  // printf("x: %x\n", x);
+  unsigned s = x & 0x80000000; // s: plus or minus
+  unsigned exp = 150; // exp: init exp, 150 = 127 + 23
+  unsigned frac = x & 0x7FFFFFFF; // frac: get absolute value
+  if (s) {
+    frac = s - frac;
+  }
+  // printf("frac: %x\n", frac);
+
+  // trim left
+  step = 8;
+  indicator = 0x80000000;
+  while (indicator && !(frac & indicator)) {
+    --step;
+    indicator >>= 1;
+  }
+  // printf("step: %d\n", step);
+  // printf("indicator: %x\n", indicator);
+
+  // trim right
+  if (step > 0) {
+    unsigned right = frac & ~(0xFFFFFFFF << step);
+    unsigned half_val = 1 << (step - 1);
+
+    frac >>= step;
+
+    // take an approximation
+    if (right > half_val) {
+      frac += 1;
+    } else if (right == half_val) {
+      if(frac & 1) {
+        frac += 1;
+      }
+    }
+
+    // special case: ux == 0xFFFFFF + 1
+    if (frac & 0x1000000) {
+      frac = 0x800000;
+      ++exp;
+    }
+
+    // printf("frac: %x\n", frac);
+    // printf("exp: %d\n", exp);
+  } else {
+    frac <<= -step;
+  }
+
+  if (!indicator) { // special case: ux == 0
+    exp = 0;
+  } else {
+    exp += step;
+  }
+  // printf("exp: %d\n", exp);
+
+  frac &= 0xFF7FFFFF;
+  
+  // printf("frac: %x\n", frac);
+
+  // printf("ux: %x\n", ux);
+  // printf("exp: %d\n", exp);
+  // printf("step: %d\n", step);
+  
+  s |= exp << 23;
+  s |= frac;
+  
+  // printf("res: %x\n", res);
+  return s;
 }
 /* 
  * float_f2i - Return bit-level equivalent of expression (int) f
@@ -282,5 +462,67 @@ unsigned float_i2f(int x) {
  *   Rating: 4
  */
 int float_f2i(unsigned uf) {
-  return 2;
+  // values will be used
+  int res, E;
+  unsigned indicator;
+
+  // printf("uf: %x\n", uf);
+  unsigned exp = (uf & 0x7F800000) >> 23;
+  // printf("exp: %d\n", exp);
+  unsigned frac = uf & 0x007FFFFF;
+
+  // NaN or infinity
+  if (!(exp ^ 0xFF)) {
+    // printf("uf is NaN or infinity\n");
+    return 0x80000000;
+  }
+
+  // if exp != 0
+  if (exp) {
+    frac |= 0x800000;
+  } else {
+    exp += 1; // E = 1 - bias when exp == 0
+  }
+
+  // calculate absolute value
+  res = frac;
+  E = exp - 150; // 150 = 127 + 23
+  indicator = 0x80;
+  if (E < 0) {
+    E = -E;
+    while (E) {
+      // printf("E: %d\n", E);
+      // printf("indicator: %d\n", indicator);
+      if (E & indicator) {
+        unsigned off_set = indicator;
+        if (off_set > 31) {
+          off_set = 31;
+        }
+        res >>= off_set;
+        // printf("res: %x\n", res);
+      }
+      E &= ~indicator;
+      indicator >>= 1;
+    }
+  } else if (E > 0) {
+    if (E > 7) { // out of range
+      return 0x80000000;
+    }
+    while (E) {
+      if (E & indicator) {
+        unsigned off_set = indicator;
+        res <<= off_set;
+      }
+      E &= ~indicator;
+      indicator >>= 1;
+    }
+  }
+  
+  // get the real value
+  if (uf & 0x80000000) {
+      res = -res;
+  }
+  
+  // printf("res: %x\n", res);
+  return res;
 }
